@@ -134,7 +134,9 @@ export function SettingsPage() {
       <Section id="omi" icon={Mic} title="OMI (daily memory import)">
         <p className="muted" style={{ margin: 0, fontSize: 13.5 }}>
           Conversations captured by your OMI wearable become one note per day in your vault, so every agent remembers them.
-          Create a developer key in the OMI app: Settings → Developer → Create key (starts with <code>omi_dev_</code>).
+          Create a developer key at{" "}
+          <a href="https://app.omi.me/developers" target="_blank" rel="noopener noreferrer">app.omi.me/developers</a> (sign in, create a key
+          that can read conversations, copy it right away). It starts with <code>omi_dev_</code>.
         </p>
         <div className="grid cols-2">
           {text("omi.apiKey", "OMI developer API key", undefined, { secret: true })}

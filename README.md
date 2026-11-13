@@ -88,7 +88,8 @@ recommendation: consensus, disagreements, and next steps. Meetings are saved, so
 ## OMI daily memory import
 
 [OMI](https://www.omi.me) records your conversations. In **Settings → OMI**, add a developer key
-(OMI app → Settings → Developer → Create key, starts with `omi_dev_`). Then press **Import from OMI** on the Memory
+(sign in at [app.omi.me/developers](https://app.omi.me/developers), create a key that can read conversations
+and copy it right away, as OMI shows it only once; it starts with `omi_dev_`). Then press **Import from OMI** on the Memory
 page, or switch on automatic import (every 6 hours). Each day becomes one note, `OMI/OMI YYYY-MM-DD.md`, with each
 conversation's title, summary, action items and, if you want them, the transcript. Importing twice never creates
 duplicates. You can also import an exported JSON file with the upload button.
