@@ -38,7 +38,11 @@ export async function PUT(req: Request) {
   if (!path) return fail("path is required");
   const r = await root();
   const isNew = (await readNote(r, path).catch(() => null)) === null;
-  await writeNote(r, path, String(content ?? ""));
+  try {
+    await writeNote(r, path, String(content ?? ""));
+  } catch (e) {
+    return fail((e as Error).message);
+  }
   if (isNew) await logActivity({ kind: "memory", title: `New note: ${path}`, href: `/memory?note=${encodeURIComponent(path)}` });
   return json({ ok: true, path: path.endsWith(".md") ? path : `${path}.md` });
 }
@@ -46,7 +50,11 @@ export async function PUT(req: Request) {
 export async function DELETE(req: Request) {
   const p = new URL(req.url).searchParams.get("path");
   if (!p) return fail("path is required");
-  await deleteNote(await root(), p);
+  try {
+    await deleteNote(await root(), p);
+  } catch (e) {
+    return fail((e as Error).message);
+  }
   return json({ ok: true });
 }
 
@@ -54,6 +62,7 @@ export async function DELETE(req: Request) {
 export async function POST(req: Request) {
   const { action, path } = await body<{ action?: string; path?: string }>(req);
   if (!path) return fail("path is required");
+  if (!path.toLowerCase().endsWith(".md")) return fail("only Markdown notes can be pinned");
   const s = await getSettings();
   const set = new Set(s.vault.profileNotes);
   if (action === "pin") set.add(path);

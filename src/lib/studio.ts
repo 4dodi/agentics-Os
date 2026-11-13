@@ -78,12 +78,27 @@ export function findMediaRefs(text: string, kind: StudioItem["kind"]): string[] 
   return [...refs];
 }
 
-async function download(url: string, dir: string, fallbackExt: string): Promise<string> {
-  const res = await fetch(url, { signal: AbortSignal.timeout(120_000) });
-  if (!res.ok) throw new Error(`download failed: HTTP ${res.status}`);
-  const ext = new URL(url).pathname.split(".").pop()?.toLowerCase() || fallbackExt;
+const MAX_DOWNLOAD_BYTES = 512 * 1024 * 1024;
+
+async function download(url: string, dir: string, fallbackExt: string, allowed: string[] = [fallbackExt]): Promise<string> {
+  const u = new URL(url);
+  if (u.protocol !== "https:" && u.protocol !== "http:") throw new Error("only http(s) downloads are allowed");
+  const res = await fetch(u, { signal: AbortSignal.timeout(120_000), redirect: "follow" });
+  if (!res.ok || !res.body) throw new Error(`download failed: HTTP ${res.status}`);
+  const declared = Number(res.headers.get("content-length") || 0);
+  if (declared > MAX_DOWNLOAD_BYTES) throw new Error("download too large");
+  // The extension decides how the file is served later, so it must be one we expect for this kind.
+  const urlExt = path.extname(u.pathname).slice(1).toLowerCase();
+  const ext = allowed.includes(urlExt) ? urlExt : fallbackExt;
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for await (const chunk of res.body as unknown as AsyncIterable<Uint8Array>) {
+    size += chunk.byteLength;
+    if (size > MAX_DOWNLOAD_BYTES) throw new Error("download too large");
+    chunks.push(chunk);
+  }
   const file = path.join(dir, `${newId()}.${ext}`);
-  await fs.writeFile(file, Buffer.from(await res.arrayBuffer()));
+  await fs.writeFile(file, Buffer.concat(chunks));
   return file;
 }
 
@@ -113,12 +128,13 @@ ${prompt}`;
   for (const ref of findMediaRefs(output, kind)) {
     if (/^https?:/i.test(ref)) {
       try {
-        return { file: await download(ref, dir, MEDIA_EXT[kind][0]), output };
+        return { file: await download(ref, dir, MEDIA_EXT[kind][0], MEDIA_EXT[kind]), output };
       } catch {
         continue;
       }
     }
-    const p = path.resolve(expandHome(ref));
+    const p = await fs.realpath(path.resolve(expandHome(ref))).catch(() => null);
+    if (!p || !MEDIA_EXT[kind].includes(path.extname(p).slice(1).toLowerCase())) continue;
     if (await fs.stat(p).then((st) => st.isFile()).catch(() => false)) return { file: p, output };
   }
   const recent = await newestSince(dir, since, MEDIA_EXT[kind]);
@@ -143,7 +159,7 @@ async function apiImage(prompt: string, dir: string, s: Settings): Promise<strin
     await fs.writeFile(file, Buffer.from(d.b64_json, "base64"));
     return file;
   }
-  if (d?.url) return download(d.url, dir, "png");
+  if (d?.url) return download(d.url, dir, "png", MEDIA_EXT.image);
   throw new Error("image API returned no image");
 }
 
@@ -169,8 +185,10 @@ export async function saveToVault(id: string, s: Settings): Promise<string> {
   const root = vaultPath(s);
   const dir = path.join(root, "Studio");
   await fs.mkdir(dir, { recursive: true });
+  const src = await fs.realpath(item.file);
+  if (!ALL_MEDIA_EXT.has(path.extname(src).slice(1).toLowerCase())) throw new Error("item is not a media file");
   const name = path.basename(item.file);
-  await fs.copyFile(item.file, path.join(dir, name));
+  await fs.copyFile(src, path.join(dir, name));
   const note = `# ${item.kind}: ${item.prompt.slice(0, 60)}\n\n![[${name}]]\n\n- Created: ${new Date(item.createdAt).toISOString()}\n- Provider: ${item.provider}\n\n## Prompt\n${item.prompt}\n`;
   const noteName = `${name.replace(/\.[^.]+$/, "")}.md`;
   await fs.writeFile(path.join(dir, noteName), note);

@@ -3,11 +3,13 @@
 import { Rocket, Sparkles } from "lucide-react";
 import { Empty, SectionTitle, Spinner } from "@/components/ui";
 import { Meta, UrlLink, type SeoData } from "./SeoPage";
+import { SearchConsolePanel } from "./SearchConsolePanel";
 
 export function HistoryTab({ data }: { data: SeoData }) {
   const deploys = data.deploys;
   return (
     <>
+      <SearchConsolePanel />
       <SectionTitle icon={Rocket} title="Recently deployed" meta={`${deploys.length} deploys logged`}>
         <button className="link-btn" onClick={data.reload}>Refresh</button>
       </SectionTitle>

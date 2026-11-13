@@ -36,6 +36,11 @@ export const AGENTS: Record<AgentId, Agent> = {
   api: apiAgent,
 };
 
+/** Whether an agent is switched on in Settings (background features skip disabled agents). */
+export function agentEnabled(id: AgentId, s: Settings): boolean {
+  return Boolean(s.agents[id]?.enabled);
+}
+
 export function getAgent(id: string): Agent | null {
   return (AGENTS as Record<string, Agent>)[id] ?? null;
 }

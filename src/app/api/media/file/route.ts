@@ -21,9 +21,9 @@ const MIME: Record<string, string> = {
 export async function GET(req: Request) {
   const u = new URL(req.url);
   const raw = u.searchParams.get("path");
-  if (!raw) return new Response("path is required", { status: 400 });
-  const ext = raw.split(".").pop()?.toLowerCase() || "";
-  if (!ALL_MEDIA_EXT.has(ext)) return new Response("not a media file", { status: 403 });
+  if (!raw || raw.includes("\0")) return new Response("path is required", { status: 400 });
+  const extOf = (p: string) => (path.extname(p).slice(1) || "").toLowerCase();
+  if (!ALL_MEDIA_EXT.has(extOf(raw))) return new Response("not a media file", { status: 403 });
 
   let real: string;
   try {
@@ -31,20 +31,29 @@ export async function GET(req: Request) {
   } catch {
     return new Response("not found", { status: 404 });
   }
+  // Check the extension of what the path really points to, so a "photo.png" symlink can't serve a non-media file.
+  const ext = extOf(real);
+  if (!ALL_MEDIA_EXT.has(ext)) return new Response("not a media file", { status: 403 });
   const s = await getSettings();
   const roots = await Promise.all(mediaRoots(s).map((r) => fs.realpath(r).catch(() => r)));
   if (!roots.some((r) => real === r || real.startsWith(r + path.sep))) {
     return new Response("outside allowed media folders (Settings → Studio → media roots)", { status: 403 });
   }
   const st = await fs.stat(real);
+  if (!st.isFile()) return new Response("not found", { status: 404 });
   const headers: Record<string, string> = {
     "content-type": MIME[ext] || "application/octet-stream",
     "accept-ranges": "bytes",
     "cache-control": "private, max-age=3600",
     "x-content-type-options": "nosniff",
   };
-  if (ext === "svg") headers["content-security-policy"] = "script-src 'none'";
-  if (u.searchParams.get("download")) headers["content-disposition"] = `attachment; filename="${path.basename(real).replace(/"/g, "")}"`;
+  // SVG and PDF can carry script: render them in an opaque, script-less sandbox, never as our origin.
+  if (ext === "svg" || ext === "pdf") headers["content-security-policy"] = "sandbox; default-src 'none'; img-src data:; style-src 'unsafe-inline'";
+  if (u.searchParams.get("download")) {
+    const name = path.basename(real);
+    const ascii = name.replace(/[^\x20-\x7e]|["\\]/g, "_");
+    headers["content-disposition"] = `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(name)}`;
+  }
 
   const range = req.headers.get("range")?.match(/bytes=(\d*)-(\d*)/);
   if (range && (range[1] || range[2])) {

@@ -20,6 +20,8 @@ const KIND_COLOR: Record<ActivityItem["kind"], string> = {
   "seo.deploy": "#22d3ee",
   studio: "#e86fd8",
   goal: "#c084fc",
+  automation: "#22d3ee",
+  boardroom: "#f59e0b",
   journal: "#fbbf24",
   memory: "#2dd4bf",
   system: "#94a3b8",

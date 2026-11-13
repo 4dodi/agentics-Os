@@ -8,6 +8,7 @@ import { api, mediaUrl, timeAgo } from "@/lib/client";
 import { PageHeader } from "@/components/PageHeader";
 import { Markdown, wikilinksToMarkdown } from "@/components/Markdown";
 import { Empty, SectionTitle, Spinner, useToast } from "@/components/ui";
+import { OmiImport } from "./OmiImport";
 
 interface Vault {
   root: string;
@@ -117,6 +118,7 @@ export function MemoryPage() {
           {vault?.notes.length ?? 0} notes · {vault?.profileNotes.length ?? 0} pinned
         </span>
         <span className="spacer" />
+        <OmiImport onImported={loadVault} openNote={open} />
         <button className="btn" onClick={() => createNote()}>
           <FilePlus2 size={15} /> New note
         </button>

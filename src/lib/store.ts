@@ -13,7 +13,9 @@ export function expandHome(p: string): string {
 }
 
 export function dataPath(...parts: string[]): string {
-  return path.join(DATA_DIR, ...parts);
+  const full = path.resolve(DATA_DIR, ...parts);
+  if (full !== DATA_DIR && !full.startsWith(DATA_DIR + path.sep)) throw new Error("Path escapes the data folder");
+  return full;
 }
 
 export function newId(prefix = ""): string {
@@ -45,9 +47,10 @@ export async function readJson<T>(name: string, fallback: T): Promise<T> {
 
 export async function writeJson(name: string, value: unknown): Promise<void> {
   const file = dataPath(name);
-  await fs.mkdir(path.dirname(file), { recursive: true });
-  const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
-  await fs.writeFile(tmp, JSON.stringify(value, null, 2));
+  await fs.mkdir(path.dirname(file), { recursive: true, mode: 0o700 });
+  const tmp = `${file}.${process.pid}.${crypto.randomBytes(4).toString("hex")}.tmp`;
+  // Stores hold API tokens, chats and memory: readable by this user only.
+  await fs.writeFile(tmp, JSON.stringify(value, null, 2), { mode: 0o600 });
   await fs.rename(tmp, file);
 }
 

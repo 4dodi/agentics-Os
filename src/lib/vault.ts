@@ -70,18 +70,45 @@ export async function listNotes(root: string): Promise<NoteMeta[]> {
   return out.sort((a, b) => b.mtime - a.mtime);
 }
 
+/**
+ * Resolve a note path for reading/writing: Markdown files only (so .obsidian plugin configs and other
+ * secrets in the vault stay private) and symlinks must not lead outside the vault.
+ */
+async function resolveNote(root: string, rel: string): Promise<string> {
+  if (rel.includes("\0")) throw new Error("Invalid note path");
+  const full = resolveInVault(root, rel);
+  if (!full.toLowerCase().endsWith(".md")) throw new Error("Only Markdown notes (.md) can be opened");
+  const realRoot = await fs.realpath(root).catch(() => root);
+  // Walk up to the deepest part of the path that exists and make sure it really lives in the vault.
+  let probe = full;
+  for (;;) {
+    const real = await fs.realpath(probe).catch(() => null);
+    if (real) {
+      const rest = path.relative(probe, full);
+      resolveInVault(realRoot, path.relative(realRoot, path.join(real, rest)));
+      return full;
+    }
+    const up = path.dirname(probe);
+    if (up === probe) return full;
+    probe = up;
+  }
+}
+
 export async function readNote(root: string, rel: string): Promise<string> {
-  return fs.readFile(resolveInVault(root, rel), "utf8");
+  return fs.readFile(await resolveNote(root, rel), "utf8");
 }
 
 export async function writeNote(root: string, rel: string, content: string): Promise<void> {
-  const full = resolveInVault(root, rel.endsWith(".md") ? rel : `${rel}.md`);
+  const full = await resolveNote(root, rel.toLowerCase().endsWith(".md") ? rel : `${rel}.md`);
   await fs.mkdir(path.dirname(full), { recursive: true });
   await fs.writeFile(full, content);
 }
 
 export async function deleteNote(root: string, rel: string): Promise<void> {
-  await fs.rm(resolveInVault(root, rel));
+  const full = await resolveNote(root, rel);
+  const st = await fs.lstat(full);
+  if (!st.isFile()) throw new Error("Not a note file");
+  await fs.rm(full);
 }
 
 /** [[Target]], [[Target|alias]], [[Target#heading]] → "Target" */

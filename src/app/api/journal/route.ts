@@ -4,24 +4,14 @@ import { ensureVault, listNotes, readNote, writeNote } from "@/lib/vault";
 import { listActivity, logActivity } from "@/lib/activity";
 import { complete, getAgent } from "@/lib/agents";
 import { body, fail, json } from "@/lib/http";
+import { JOURNAL_DIR as DIR, appendToSection, isDate, journalTemplate as template } from "@/lib/journal";
 
 export const dynamic = "force-dynamic";
-const DIR = "Journal";
-
-function isDate(d: unknown): d is string {
-  return typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d);
-}
 
 function dayBounds(date: string, tzOffsetMin: number) {
   // date is the user's local calendar day; tzOffsetMin is Date#getTimezoneOffset() from the browser.
   const start = Date.parse(`${date}T00:00:00Z`) + tzOffsetMin * 60_000;
   return { start, end: start + 86_400_000 };
-}
-
-function template(date: string) {
-  const d = new Date(`${date}T12:00:00Z`);
-  const label = d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric", timeZone: "UTC" });
-  return `# ${label}\n\n## Focus\n- \n\n## Log\n`;
 }
 
 export async function GET(req: Request) {
@@ -76,9 +66,7 @@ export async function POST(req: Request) {
     const text = String(b.text || "").trim();
     if (!text) return fail("text is required");
     const line = `- ${b.time || new Date().toTimeString().slice(0, 5)} ${text}`;
-    content = /^## Log\s*$/m.test(content)
-      ? content.replace(/(^## Log\s*\n(?:(?!^## ).*\n?)*)/m, (sec) => sec.trimEnd() + "\n" + line + "\n")
-      : content.trimEnd() + `\n\n## Log\n${line}\n`;
+    content = appendToSection(content, "Log", line);
     await logActivity({ kind: "journal", title: text.slice(0, 90), href: `/journal?date=${b.date}` });
   }
   await writeNote(root, rel, content);

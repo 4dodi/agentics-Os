@@ -13,6 +13,8 @@ export interface SeoSite {
   angle: string;
   blogPath: string;
   enabled: boolean;
+  /** Google Search Console property, e.g. "sc-domain:example.com" or "https://example.com/". Empty = sc-domain:<domain>. */
+  gscProperty: string;
 }
 
 export interface Settings {
@@ -44,7 +46,23 @@ export interface Settings {
     };
     api: { enabled: boolean; baseUrl: string; apiKey: string; model: string };
   };
-  seo: { engine: AgentId; netlifyToken: string; preserveExisting: boolean; useMemory: boolean; sites: SeoSite[] };
+  seo: {
+    engine: AgentId;
+    netlifyToken: string;
+    preserveExisting: boolean;
+    useMemory: boolean;
+    sites: SeoSite[];
+    /** Google service-account key (JSON) with read access to your Search Console properties. */
+    gscServiceAccount: string;
+  };
+  omi: {
+    apiKey: string;
+    baseUrl: string;
+    /** Vault folder the daily OMI notes go into. */
+    folder: string;
+    autoImport: boolean;
+    includeTranscript: boolean;
+  };
   studio: {
     imageProvider: "hermes" | "claude" | "openclaw" | "api";
     videoProvider: "hermes" | "claude" | "openclaw";
@@ -106,7 +124,7 @@ export type ChatEvent =
 export interface ActivityItem {
   id: string;
   ts: number;
-  kind: "chat" | "seo.generate" | "seo.deploy" | "studio" | "goal" | "journal" | "memory" | "system";
+  kind: "chat" | "seo.generate" | "seo.deploy" | "studio" | "goal" | "automation" | "boardroom" | "journal" | "memory" | "system";
   agent?: AgentId;
   title: string;
   detail?: string;
@@ -123,8 +141,75 @@ export interface Goal {
   status: "active" | "done" | "paused";
   progress: number;
   milestones: { id: string; text: string; done: boolean }[];
+  /** Only for kind "automation": what to run and when. */
+  automation?: AutomationSpec;
   createdAt: number;
   updatedAt: number;
+}
+
+export interface AutomationSpec {
+  agent: AgentId;
+  prompt: string;
+  every: "hour" | "day" | "week";
+  /** 0 = Sunday … 6 = Saturday (weekly only). */
+  weekday: number;
+  /** "HH:MM" in the server's local time (daily and weekly). */
+  time: string;
+  enabled: boolean;
+  useMemory: boolean;
+  /** Append each result to today's journal note. */
+  toJournal: boolean;
+  nextRunAt?: number;
+  lastRunAt?: number;
+  lastStatus?: "running" | "ok" | "error";
+}
+
+export interface AutomationRun {
+  id: string;
+  goalId: string;
+  title: string;
+  agent: AgentId;
+  trigger: "schedule" | "manual";
+  startedAt: number;
+  ms?: number;
+  status: "running" | "ok" | "error";
+  output?: string;
+  error?: string;
+}
+
+export interface BoardroomReply {
+  agent: AgentId;
+  status: "running" | "done" | "error";
+  text: string;
+  ms?: number;
+  error?: string;
+}
+
+export interface BoardroomSession {
+  id: string;
+  prompt: string;
+  ts: number;
+  useMemory: boolean;
+  replies: BoardroomReply[];
+  synthesis?: BoardroomReply;
+}
+
+export interface GscDay {
+  date: string;
+  clicks: number;
+  impressions: number;
+}
+
+export interface GscSiteReport {
+  siteId: string;
+  domain: string;
+  color: string;
+  property: string;
+  ok: boolean;
+  error?: string;
+  days: GscDay[];
+  clicks: number;
+  impressions: number;
 }
 
 export interface KanbanCard {

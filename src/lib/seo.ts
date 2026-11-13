@@ -1,6 +1,6 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { marked } from "marked";
+import { Marked } from "marked";
 import type { AgentId, SeoArticle, SeoPost, SeoSession, SeoSite, Settings, Transcript } from "./types";
 import { dataPath, newId, readJson, updateJson } from "./store";
 import { complete } from "./agents";
@@ -182,7 +182,7 @@ export async function startGeneration(input: GenerateInput, s: Settings): Promis
   const keyword = input.keyword.trim();
   const slug = slugify(input.slug || keyword);
   if (!keyword || !slug) throw new Error("keyword is required");
-  const sites = s.seo.sites.filter((x) => x.enabled && (!input.siteIds?.length || input.siteIds.includes(x.id)));
+  const sites = s.seo.sites.filter((x) => x.enabled && x.domain && (!input.siteIds?.length || input.siteIds.includes(x.id)));
   if (!sites.length) throw new Error("Add at least one site in Settings → SEO sites first");
 
   let transcript = "";
@@ -340,13 +340,60 @@ ${o.body}
 `;
 }
 
-/** Model output is published to the open web: drop scripts, frames and inline handlers. */
+/** URL schemes allowed in published links and images. Relative URLs and #anchors are always allowed. */
+export function safeUrl(href: string | null | undefined): string | null {
+  if (!href) return null;
+  // Browsers ignore control characters and whitespace inside a scheme ("java\tscript:"), so strip them first.
+  // eslint-disable-next-line no-control-regex
+  const probe = href.replace(/[\u0000-\u0020\u007f-\u009f]/g, "").toLowerCase();
+  const scheme = probe.match(/^([a-z][a-z0-9+.-]*):/)?.[1];
+  if (!scheme) return href.trim(); // relative, protocol-relative or #anchor
+  return ["http", "https", "mailto"].includes(scheme) ? href.trim() : null;
+}
+
+/**
+ * Model output is published to the open web, so it is rendered allow-list style:
+ * raw HTML in the Markdown is escaped (shown as text, never parsed) and only http(s)/mailto/relative URLs survive.
+ */
+const articleMarked = new Marked({ gfm: true });
+articleMarked.use({
+  renderer: {
+    html({ text }) {
+      return esc(text);
+    },
+    link({ href, title, tokens }) {
+      const inner = this.parser.parseInline(tokens);
+      const url = safeUrl(href);
+      if (!url) return inner;
+      const external = /^(https?:)?\/\//i.test(url);
+      return `<a href="${esc(url)}"${title ? ` title="${esc(title)}"` : ""}${external ? ' rel="noopener nofollow"' : ""}>${inner}</a>`;
+    },
+    image({ href, title, text }) {
+      const url = safeUrl(href);
+      if (!url || /^mailto:/i.test(url)) return esc(text);
+      return `<img src="${esc(url)}" alt="${esc(text)}"${title ? ` title="${esc(title)}"` : ""} loading="lazy">`;
+    },
+  },
+});
+
+export function renderMarkdown(markdown: string): string {
+  return stripActiveContent(articleMarked.parse(markdown, { async: false }) as string);
+}
+
+/** Defence in depth on top of renderMarkdown: drop anything active that still made it into the HTML. */
 export function stripActiveContent(html: string): string {
-  return html
-    .replace(/<(script|iframe|object|embed|style)\b[\s\S]*?<\/\1\s*>/gi, "")
-    .replace(/<(script|iframe|object|embed|style)\b[^>]*\/?>/gi, "")
-    .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
-    .replace(/(href|src)\s*=\s*(["'])\s*javascript:[^"']*\2/gi, '$1="#"');
+  let out = html;
+  // Repeat until stable so nested tricks like <scr<script>ipt> can't reassemble.
+  for (let i = 0; i < 5; i++) {
+    const next = out
+      .replace(/<(script|iframe|frame|frameset|object|embed|style|base|meta|link|form|svg|math|template|noscript)\b[\s\S]*?<\/\1\s*>/gi, "")
+      .replace(/<\/?(script|iframe|frame|frameset|object|embed|style|base|meta|link|form|svg|math|template|noscript)\b[^>]*>/gi, "")
+      .replace(/(?:\s+|(?<=[/"']))on[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+      .replace(/(href|src|action|formaction|xlink:href)\s*=\s*(["']?)\s*(?:javascript|vbscript|data):[^"'\s>]*\2/gi, '$1="#"');
+    if (next === out) break;
+    out = next;
+  }
+  return out;
 }
 
 function fmtDate(iso: string) {
@@ -356,7 +403,7 @@ function fmtDate(iso: string) {
 export async function renderPost(site: SeoSite, post: SeoPost, posts: SeoPost[]): Promise<string | null> {
   const md = await readPostMarkdown(site.domain, post.slug);
   if (md === null) return null;
-  const html = stripActiveContent(await marked.parse(md, { gfm: true }));
+  const html = renderMarkdown(md);
   const related = posts.filter((p) => p.slug !== post.slug).slice(0, 5);
   const canonical = postUrl(site, post.slug);
   const body = `<p class="meta">${fmtDate(post.date)} · ${Math.max(1, Math.round(post.words / 230))} min read</p>

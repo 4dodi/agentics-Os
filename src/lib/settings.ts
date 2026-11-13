@@ -57,6 +57,14 @@ export function defaultSettings(): Settings {
       preserveExisting: true,
       useMemory: true,
       sites: [],
+      gscServiceAccount: process.env.GSC_SERVICE_ACCOUNT_JSON || "",
+    },
+    omi: {
+      apiKey: process.env.OMI_API_KEY || "",
+      baseUrl: process.env.OMI_API_URL || "https://api.omi.me",
+      folder: "OMI",
+      autoImport: false,
+      includeTranscript: false,
     },
     studio: {
       imageProvider: "hermes",
@@ -79,7 +87,9 @@ const SECRET_PATHS = [
   "agents.openclaw.token",
   "agents.api.apiKey",
   "seo.netlifyToken",
+  "seo.gscServiceAccount",
   "studio.apiKey",
+  "omi.apiKey",
 ];
 
 type Obj = Record<string, unknown>;
@@ -88,10 +98,13 @@ function isObj(v: unknown): v is Obj {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
+const UNSAFE_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
 function deepMerge<T>(base: T, over: unknown): T {
   if (!isObj(base) || !isObj(over)) return (over === undefined ? base : (over as T));
   const out: Obj = { ...(base as Obj) };
   for (const [k, v] of Object.entries(over)) {
+    if (UNSAFE_KEYS.has(k)) continue;
     out[k] = k in out && isObj(out[k]) && isObj(v) ? deepMerge(out[k], v) : v;
   }
   return out as T;
@@ -120,8 +133,9 @@ function mask(v: string): string {
 export async function getSettings(): Promise<Settings> {
   const stored = await readJson<Obj>(FILE, {});
   const s = deepMerge(defaultSettings(), stored);
-  s.seo.sites = (s.seo.sites || []).map(normaliseSite);
+  s.seo.sites = (Array.isArray(s.seo.sites) ? s.seo.sites : []).map(normaliseSite);
   s.vault.maxContextChars = Number(s.vault.maxContextChars) || 6000;
+  s.omi.folder = cleanVaultFolder(s.omi.folder, "OMI");
   return s;
 }
 
@@ -154,21 +168,56 @@ export async function saveSettings(patch: Obj): Promise<Settings> {
 
 const SITE_COLORS = ["#fb7185", "#c084fc", "#22d3ee", "#f472b6", "#a3e635", "#fbbf24", "#60a5fa"];
 
-export function normaliseSite(site: Partial<SeoSite>, i = 0): SeoSite {
-  const domain = String(site.domain || "")
+/** Hostname characters only, so a domain can't break out of the data folder or the generated HTML. */
+export function cleanDomain(raw: unknown): string {
+  const d = String(raw || "")
     .trim()
-    .replace(/^https?:\/\//, "")
-    .replace(/\/.*$/, "")
+    .replace(/^https?:\/\//i, "")
+    .replace(/[/?#].*$/, "")
+    .replace(/:\d+$/, "")
     .toLowerCase();
+  return /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?)*$/.test(d) ? d : "";
+}
+
+/** URL path segments made of safe characters only; no "." / ".." segments. */
+export function cleanBlogPath(raw: unknown): string {
+  const segs = String(raw ?? "blog")
+    .split("/")
+    .map((x) => x.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^-+|-+$/g, ""))
+    .filter(Boolean);
+  return segs.join("/") || "blog";
+}
+
+/** A vault-relative folder: plain names only, no "." / ".." segments or leading slash. */
+export function cleanVaultFolder(raw: unknown, fallback: string): string {
+  const segs = String(raw ?? "")
+    .split(/[\\/]/)
+    .map((x) => x.replace(/[^\p{L}\p{N} _-]+/gu, "").trim())
+    .filter(Boolean);
+  return segs.join("/") || fallback;
+}
+
+/** A CSS colour that can't escape the inline <style> block it's written into. */
+export function cleanColor(raw: unknown, fallback: string): string {
+  const c = String(raw || "").trim();
+  if (/^#[0-9a-f]{3,8}$/i.test(c)) return c;
+  if (/^(rgb|rgba|hsl|hsla|oklch|oklab)\([0-9.,%\s/+-]+\)$/i.test(c)) return c;
+  if (/^[a-z]{3,30}$/i.test(c)) return c;
+  return fallback;
+}
+
+export function normaliseSite(site: Partial<SeoSite>, i = 0): SeoSite {
+  const domain = cleanDomain(site.domain);
   return {
-    id: site.id || domain || `site-${i}`,
-    name: site.name || domain,
+    id: String(site.id || domain || `site-${i}`).replace(/[^\w.-]/g, "-"),
+    name: String(site.name || domain).slice(0, 120),
     domain,
-    netlifySiteId: site.netlifySiteId || "",
-    color: site.color || SITE_COLORS[i % SITE_COLORS.length],
-    angle: site.angle || "",
-    blogPath: (site.blogPath || "blog").replace(/^\/+|\/+$/g, ""),
+    netlifySiteId: String(site.netlifySiteId || "").trim(),
+    color: cleanColor(site.color, SITE_COLORS[i % SITE_COLORS.length]),
+    angle: String(site.angle || ""),
+    blogPath: cleanBlogPath(site.blogPath),
     enabled: site.enabled !== false,
+    gscProperty: String(site.gscProperty || "").trim().slice(0, 300),
   };
 }
 

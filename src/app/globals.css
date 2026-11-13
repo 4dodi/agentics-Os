@@ -393,3 +393,46 @@ label.field .hint { font-size: 12px; color: var(--faint); }
   .head-actions { flex-wrap: wrap; }
   .split { grid-template-columns: 1fr; }
 }
+
+/* ---------------------------------------------------------------- automations */
+.automation-panel { margin-top: 14px; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--panel); }
+.select.sm, .input.sm { padding: 6px 30px 6px 10px; font-size: 13px; width: auto; }
+.input.sm { padding: 6px 10px; }
+.run-row > button { background: none; border: 0; padding: 2px 0; color: inherit; cursor: pointer; gap: 8px; text-align: left; }
+.run-row > button:disabled { cursor: default; }
+
+/* ---------------------------------------------------------------- search console */
+.seg { display: inline-flex; border: 1px solid var(--line-2); border-radius: 999px; padding: 3px; gap: 2px; }
+.seg button { background: none; border: 0; color: var(--muted); font: inherit; font-size: 13px; padding: 5px 12px; border-radius: 999px; cursor: pointer; }
+.seg button:hover { color: var(--text); background: var(--panel-2); }
+.seg button.on { color: var(--text); background: var(--panel-3); font-weight: 600; }
+.gsc-hero .hero-num { font-size: 52px; font-weight: 600; line-height: 1.05; letter-spacing: -0.02em; margin: 4px 0 6px; }
+.gsc-site .domain { font-weight: 500; font-size: 15px; }
+.key { display: inline-block; width: 14px; height: 3px; border-radius: 2px; flex: none; }
+.clicks-chart { margin-top: 10px; }
+.clicks-chart svg { display: block; overflow: visible; outline: none; touch-action: pan-y; }
+.clicks-chart svg:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent) 60%, transparent); outline-offset: 4px; border-radius: 6px; }
+.clicks-chart .grid { stroke: var(--line-2); stroke-width: 1; }
+.clicks-chart .crosshair { stroke: var(--muted); stroke-width: 1; }
+.clicks-chart .ring { stroke: #110f1c; stroke-width: 2; }
+.clicks-chart .tick { fill: var(--faint); font-size: 11px; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.clicks-chart .end-label { fill: var(--muted); font-size: 12px; font-weight: 600; }
+.chart-tip { position: absolute; pointer-events: none; width: 140px; padding: 8px 10px; border-radius: 10px; background: #17142a; border: 1px solid var(--line-2); box-shadow: 0 8px 24px rgba(0,0,0,.35); }
+.data-table { border-collapse: collapse; width: 100%; font-size: 13px; }
+.data-table th, .data-table td { text-align: left; padding: 7px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.data-table td { font-variant-numeric: tabular-nums; font-family: var(--mono); }
+.data-table thead th { color: var(--muted); font-weight: 500; vertical-align: bottom; }
+
+/* ---------------------------------------------------------------- boardroom */
+.member-chip { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line-2); background: none; color: var(--muted); font: inherit; font-size: 13.5px; cursor: pointer; }
+.member-chip:hover { color: var(--text); }
+.member-chip.on { color: var(--text); border-color: color-mix(in srgb, var(--c) 55%, transparent); background: color-mix(in srgb, var(--c) 12%, transparent); }
+.member-chip .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); }
+.member-chip .dot.on { background: var(--ok); }
+.board-question { margin-bottom: 14px; font-size: 15px; white-space: pre-wrap; }
+.board-reply { border-top: 2px solid color-mix(in srgb, var(--accent) 60%, transparent); }
+.board-body { margin-top: 12px; font-size: 14.5px; max-height: 520px; overflow-y: auto; overflow-wrap: anywhere; }
+.board-hist { display: flex; align-items: center; gap: 10px; }
+.board-hist.on { border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+.board-hist-open { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; background: none; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; padding: 0; }
+.board-hist-open .q { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
