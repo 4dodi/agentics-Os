@@ -1,9 +1,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { splitArgs, templateArgs, stripAnsi } from "../src/lib/proc";
-import { cleanTranscript, parseArticle, slugify, stripActiveContent, wordCount } from "../src/lib/seo";
+import { promises as fs } from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { cleanTranscript, parseArticle, renderMarkdown, safeUrl, slugify, stripActiveContent, wordCount } from "../src/lib/seo";
+import { cleanBlogPath, cleanColor, cleanDomain, normaliseSite } from "../src/lib/settings";
+import { checkRequest } from "../src/proxy";
 import { findMediaRefs } from "../src/lib/studio";
-import { extractLinks, resolveInVault } from "../src/lib/vault";
+import { extractLinks, readNote, resolveInVault, writeNote } from "../src/lib/vault";
 import { cleanCliOutput } from "../src/lib/agents/hermes";
 import { flattenPrompt } from "../src/lib/agents/base";
 
@@ -80,4 +85,87 @@ test("cleanCliOutput strips box chrome but keeps content", () => {
 test("flattenPrompt includes system, history and prompt", () => {
   const p = flattenPrompt({ prompt: "now", system: "SYS", history: [{ role: "user", content: "hi" }, { role: "assistant", content: "yo" }] });
   assert.match(p, /^SYS[\s\S]*User: hi[\s\S]*You: yo[\s\S]*now$/);
+});
+
+// ---------------------------------------------------------------- security hardening
+
+test("stripActiveContent catches slash-separated handlers, unquoted javascript: and nesting", () => {
+  assert.equal(stripActiveContent(`<img/onerror=alert(1) src=x>`), `<img/ src=x>`);
+  assert.equal(stripActiveContent(`<a href=javascript:alert(1)>x</a>`), `<a href="#">x</a>`);
+  assert.doesNotMatch(stripActiveContent(`<scr<script>ipt>alert(1)</script>`), /<script/i);
+  assert.doesNotMatch(stripActiveContent(`<svg><animate onbegin=alert(1)></svg><form action="javascript:x"></form>`), /svg|form|onbegin|javascript/i);
+});
+
+test("renderMarkdown escapes raw HTML and drops dangerous URLs", () => {
+  const html = renderMarkdown(
+    [
+      `<script>alert(1)</script>`,
+      `<img src=x onerror=alert(1)>`,
+      `[click](javascript:alert(1)) [tab](java\tscript:alert(1)) [data](data:text/html,<b>x</b>)`,
+      `![pic](javascript:alert(1)) ![ok](/img/a.png)`,
+      `[good](https://example.com/a?b=1) [rel](/blog/x/) [mail](mailto:a@b.c)`,
+    ].join("\n\n"),
+  );
+  assert.doesNotMatch(html, /<script|<img src="?x|onerror=|href="(javascript|java\s*script|data):/i);
+  assert.match(html, /&lt;script&gt;/);
+  assert.match(html, /<a href="https:\/\/example\.com\/a\?b=1" rel="noopener nofollow">good<\/a>/);
+  assert.match(html, /<a href="\/blog\/x\/">rel<\/a>/);
+  assert.match(html, /<a href="mailto:a@b\.c">mail<\/a>/);
+  assert.match(html, /<img src="\/img\/a\.png" alt="ok"/);
+});
+
+test("safeUrl allows only http(s), mailto and relative URLs", () => {
+  for (const ok of ["https://x.y", "http://x.y", "mailto:a@b.c", "/a", "#top", "a/b", "//cdn.x"]) assert.ok(safeUrl(ok), ok);
+  for (const bad of ["javascript:x", " JaVaScRiPt:x", "java\nscript:x", "vbscript:x", "data:text/html,x", "file:///etc/passwd"])
+    assert.equal(safeUrl(bad), null, bad);
+});
+
+test("site fields are cleaned before they reach HTML, CSS or the filesystem", () => {
+  assert.equal(cleanDomain("https://Example.com/path?q"), "example.com");
+  assert.equal(cleanDomain(".."), "");
+  assert.equal(cleanDomain("a/../../etc"), "a");
+  assert.equal(cleanDomain(`x"><script>`), "");
+  assert.equal(cleanBlogPath("../../etc"), "etc");
+  assert.equal(cleanBlogPath(`/Blog/"><x>/`), "blog/x");
+  assert.equal(cleanBlogPath(""), "blog");
+  assert.equal(cleanColor("#ff00aa", "#000"), "#ff00aa");
+  assert.equal(cleanColor("rgb(1, 2, 3)", "#000"), "rgb(1, 2, 3)");
+  assert.equal(cleanColor("red;}</style><script>alert(1)</script>", "#000"), "#000");
+  const site = normaliseSite({ domain: "Ex.com", color: "}</style>", blogPath: "../x", id: "a/b" });
+  assert.deepEqual([site.domain, site.color.startsWith("#"), site.blogPath, site.id], ["ex.com", true, "x", "a-b"]);
+});
+
+test("API guard blocks foreign hosts, cross-site requests and CSRF", () => {
+  const req = (method: string, h: Record<string, string>) => ({ method, headers: new Headers(h) });
+  const local = { host: "127.0.0.1:3737" };
+  assert.equal(checkRequest(req("GET", local)), null);
+  assert.equal(checkRequest(req("GET", { host: "[::1]:3737" })), null);
+  assert.equal(checkRequest(req("GET", { host: "evil.com" })), "Forbidden host");
+  assert.equal(checkRequest(req("GET", { host: "localhost.evil.com:3737" })), "Forbidden host");
+  assert.equal(checkRequest(req("GET", { ...local, "sec-fetch-site": "cross-site" })), "Cross-site request blocked");
+  assert.equal(checkRequest(req("GET", { ...local, "sec-fetch-site": "same-site" })), "Cross-site request blocked");
+  assert.equal(checkRequest(req("GET", { ...local, "sec-fetch-site": "same-origin" })), null);
+  assert.equal(checkRequest(req("POST", { ...local, origin: "null", "x-agentic-os": "1" })), "Cross-origin request blocked");
+  assert.equal(checkRequest(req("POST", { ...local, origin: "http://evil.com", "x-agentic-os": "1" })), "Cross-origin request blocked");
+  assert.equal(checkRequest(req("POST", local)), "Missing x-agentic-os header");
+  assert.equal(checkRequest(req("POST", { ...local, origin: "http://127.0.0.1:3737", "x-agentic-os": "1" })), null);
+});
+
+test("vault notes: Markdown only, and symlinks can't escape the vault", async () => {
+  const base = await fs.mkdtemp(path.join(os.tmpdir(), "aos-vault-"));
+  const vault = path.join(base, "vault");
+  await fs.mkdir(vault);
+  await fs.writeFile(path.join(base, "secret.md"), "outside");
+  await fs.writeFile(path.join(vault, "ok.md"), "inside");
+  await fs.writeFile(path.join(vault, "config.json"), "{}");
+  await fs.symlink(path.join(base, "secret.md"), path.join(vault, "link.md"));
+  await fs.symlink(base, path.join(vault, "outdir"));
+  assert.equal(await readNote(vault, "ok.md"), "inside");
+  await assert.rejects(readNote(vault, "config.json"), /Markdown/);
+  await assert.rejects(readNote(vault, "link.md"), /escapes/);
+  await assert.rejects(readNote(vault, "outdir/secret.md"), /escapes/);
+  await assert.rejects(writeNote(vault, "outdir/new", "x"), /escapes/);
+  await writeNote(vault, "Folder/New note", "hello");
+  assert.equal(await readNote(vault, "Folder/New note.md"), "hello");
+  await fs.rm(base, { recursive: true, force: true });
 });

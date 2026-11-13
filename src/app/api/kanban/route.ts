@@ -28,6 +28,7 @@ export async function POST(req: Request) {
 export async function PATCH(req: Request) {
   const b = await body<Partial<KanbanCard> & { id?: string }>(req);
   if (!b.id) return fail("id is required");
+  if (b.column && !["todo", "doing", "done"].includes(b.column)) return fail("column must be todo, doing or done");
   let updated: KanbanCard | undefined;
   await updateJson<KanbanCard[]>(FILE, [], (l) =>
     l.map((c) => (c.id === b.id ? (updated = { ...c, ...(b.column ? { column: b.column } : {}), ...(b.text ? { text: b.text } : {}) }) : c)),

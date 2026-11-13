@@ -103,10 +103,18 @@ Browser (Next.js React UI) ──► Next.js route handlers (/api/*)  ── loc
 
 Status: v0.1 built and verified. Claude Code tested live; Hermes and OpenClaw tested through the mock CLIs;
 Netlify deploys tested against a mock API, including the check that existing site files are preserved;
-14 unit tests; production build passes.
+20 unit tests; production build passes.
 
 **Not verified yet:** real Hermes/OpenClaw CLI flags (they're editable templates), a real Netlify account,
 and real image/video generation tools.
+
+### Phase 6 — Security hardening ✅
+- [x] Allow-list Markdown renderer for published articles (raw HTML escaped, URL schemes allow-listed)
+- [x] Cross-site request blocking via `Sec-Fetch-Site`, strict `Origin` handling, CSP and anti-framing headers
+- [x] No remote image/media auto-loading in the UI (closes prompt-injection exfiltration through image URLs)
+- [x] Media and vault access checked after `realpath`; vault limited to `.md`; data files written `0600`
+- [x] Validation of SEO site fields, goal and kanban updates; prototype-safe settings merge
+- [x] Dependencies updated (Next 16.4.6, marked 18.2, lucide-react 1.72, geist 1.9); `npm audit` clean
 
 ### Later (v2 ideas)
 - OMI daily memory import → vault; scheduled automations ("one per week") runner

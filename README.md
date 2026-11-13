@@ -101,17 +101,26 @@ This app can drive agents that run code, so it's locked down to your own machine
 
 - It binds to `127.0.0.1` only.
 - `src/proxy.ts` rejects API requests whose `Host` isn't loopback, which blocks DNS rebinding.
-- It also rejects state-changing requests that are cross-origin or lack the `x-agentic-os` header, which blocks CSRF from other sites.
   To allow LAN access deliberately, set `AGENTIC_OS_ALLOWED_HOSTS`.
+- It rejects cross-site API requests (`Sec-Fetch-Site`), including GETs, so other websites can't probe it with `<img>` or `<video>` tags.
+- State-changing requests must be same-origin and carry the `x-agentic-os` header, which blocks CSRF. An opaque `Origin: null` is refused.
+- Pages are served with a Content-Security-Policy that blocks remote images and media and limits network calls to the app itself.
+  Agent replies and notes therefore can't send your data to another server through an image URL.
+  Remote images in chat replies appear as links. Framing by other sites is blocked by `X-Frame-Options` and `frame-ancestors`.
 - The agent consoles spawn the agent's own binary with argv. No shell is involved.
-- `/api/media/file` serves only media file extensions, and only from allowed folders. Paths are resolved through `realpath`.
-- Vault paths can't escape the vault. Secrets are masked whenever the API returns settings.
+- `/api/media/file` serves only media files from allowed folders. The extension is checked on the real file after `realpath`, so a
+  `photo.png` symlink can't serve something else. SVG and PDF are served in a script-less CSP sandbox.
+- Vault access is limited to `.md` notes inside the vault. Symlinks that lead outside are refused, and `.obsidian` configs stay private.
+- SEO articles are rendered allow-list style. Raw HTML in model output is escaped and only `http(s)`, `mailto` and relative URLs are kept.
+  Site fields (domain, blog path, colour) are validated before they reach HTML, CSS or file paths. The preview runs in a CSP sandbox.
+- Studio downloads only accept http(s), keep a media extension and are capped at 512 MB.
+- Secrets are masked whenever the API returns settings. Files in `data/` are written with mode `0600`.
 
 ## Development
 
 ```bash
 npm run typecheck
-npm test                      # unit tests: arg parsing, article parsing, transcript cleanup, media refs, vault guards
+npm test                      # unit tests: arg parsing, articles, transcripts, media refs, vault guards, sanitiser, API guard
 node tests/mock-netlify.mjs   # Netlify API double on :3999
 NETLIFY_API_URL=http://127.0.0.1:3999/api/v1 npm run dev   # deploy against the mock (token: test-token, site id: site-1)
 ```

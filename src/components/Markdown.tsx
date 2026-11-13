@@ -14,6 +14,14 @@ export function wikilinksToMarkdown(md: string, embedUrl?: (name: string) => str
     );
 }
 
+function hostOf(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return "external";
+  }
+}
+
 export function Markdown({ children, onWikiLink }: { children: string; onWikiLink?: (target: string) => void }) {
   return (
     <div className="md">
@@ -37,7 +45,19 @@ export function Markdown({ children, onWikiLink }: { children: string; onWikiLin
               );
             }
             const safe = href && /^(https?:|mailto:|\/|#)/i.test(href) ? href : undefined;
-            return <a {...props} href={safe} target="_blank" rel="noreferrer" />;
+            return <a {...props} href={safe} target="_blank" rel="noopener noreferrer" />;
+          },
+          // Only same-origin images load inline. Remote images become links, so a reply can't
+          // exfiltrate memory or chat content through an image URL just by being rendered.
+          img: ({ node: _n, src, alt, ...props }) => {
+            const url = typeof src === "string" ? src : "";
+            if (/^(\/api\/media\/|data:image\/(png|jpe?g|gif|webp);)/i.test(url)) return <img {...props} src={url} alt={alt || ""} />;
+            const link = /^https?:/i.test(url) ? url : undefined;
+            return (
+              <a href={link} target="_blank" rel="noopener noreferrer" className="ext-image">
+                🖼 {alt || "image"}{link ? ` (${hostOf(link)})` : ""}
+              </a>
+            );
           },
         }}
       >

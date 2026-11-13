@@ -14,6 +14,8 @@ export async function GET(req: Request) {
   const html = post ? await renderPost(site, post, posts) : null;
   if (!html) return new Response("post not found", { status: 404 });
   return new Response(html, {
-    headers: { "content-type": "text/html; charset=utf-8", "content-security-policy": "script-src 'none'" },
+    headers: { "content-type": "text/html; charset=utf-8", "content-security-policy": "sandbox allow-popups allow-popups-to-escape-sandbox; script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'",
+      "x-content-type-options": "nosniff",
+      "referrer-policy": "no-referrer" },
   });
 }

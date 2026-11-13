@@ -25,7 +25,14 @@ function mediaIn(text: string): { url: string; kind: "image" | "video" | "audio"
     const ext = ref.split(".").pop()!.toLowerCase();
     const kind = /mp4|webm|mov|m4v/.test(ext) ? "video" : /mp3|wav|ogg|m4a/.test(ext) ? "audio" : /png|jpe?g|webp|gif/.test(ext) ? "image" : null;
     if (!kind) continue;
-    out.set(/^https?:/.test(ref) && !ref.includes("/api/media/") ? ref : mediaUrl(ref), kind);
+    // Remote URLs are not auto-loaded: an agent reply (possibly steered by prompt injection) could
+    // otherwise smuggle data out in an image URL. They are shown as links instead.
+    if (/^https?:/i.test(ref)) {
+      if (!/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/api\/media\//i.test(ref)) continue;
+      ref = new URL(ref).searchParams.get("path") || "";
+      if (!ref) continue;
+    }
+    out.set(mediaUrl(ref), kind);
   }
   return [...out].slice(0, 4).map(([url, kind]) => ({ url, kind }));
 }

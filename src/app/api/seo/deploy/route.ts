@@ -18,7 +18,7 @@ export async function POST(req: Request) {
   const { siteIds } = await body<{ siteIds?: string[] }>(req);
   const s = await getSettings();
   if (!s.seo.netlifyToken) return fail("Add a Netlify personal access token in Settings → SEO first");
-  const sites = s.seo.sites.filter((x) => siteIds?.includes(x.id));
+  const sites = s.seo.sites.filter((x) => x.domain && Array.isArray(siteIds) && siteIds.includes(x.id));
   if (!sites.length) return fail("no sites selected");
 
   const records: SeoDeploy[] = sites.map((site) => ({

@@ -23,7 +23,7 @@ export async function POST(req: Request) {
     target: b.target || "",
     status: "active",
     progress: 0,
-    milestones: (b.milestones || []).map((m) => ({ id: newId("ms_"), text: m.text, done: !!m.done })),
+    milestones: (Array.isArray(b.milestones) ? b.milestones : []).map((m) => ({ id: newId("ms_"), text: String(m?.text ?? ""), done: !!m?.done })),
     createdAt: now,
     updatedAt: now,
   };
@@ -41,7 +41,15 @@ export async function PATCH(req: Request) {
     l.map((g) => {
       if (g.id !== b.id) return g;
       const milestones = b.milestones?.map((m) => ({ id: m.id || newId("ms_"), text: m.text, done: !!m.done })) ?? g.milestones;
-      out = withProgress({ ...g, ...b, milestones, id: g.id, createdAt: g.createdAt, updatedAt: Date.now() } as Goal);
+      // Only user-editable fields are taken from the request; ids and timestamps stay ours.
+      const edit: Partial<Goal> = {};
+      if (typeof b.title === "string" && b.title.trim()) edit.title = b.title.trim();
+      if (typeof b.why === "string") edit.why = b.why;
+      if (typeof b.target === "string") edit.target = b.target;
+      if (b.kind === "goal" || b.kind === "automation") edit.kind = b.kind;
+      if (b.status === "active" || b.status === "done" || b.status === "paused") edit.status = b.status;
+      if (typeof b.progress === "number" && Number.isFinite(b.progress)) edit.progress = Math.max(0, Math.min(100, Math.round(b.progress)));
+      out = withProgress({ ...g, ...edit, milestones, updatedAt: Date.now() } as Goal);
       if (out.milestones.length && out.progress === 100 && g.status !== "done" && b.status === undefined) out.status = "done";
       completed = out.status === "done" && g.status !== "done";
       return out;
