@@ -96,3 +96,13 @@ export function cityFromTimezone(): string {
     return "local";
   }
 }
+
+export function timeUntil(ts: number): string {
+  const s = Math.round((ts - Date.now()) / 1000);
+  if (s <= 30) return "due now";
+  const m = Math.round(s / 60);
+  if (m < 60) return `in ${m}m`;
+  const h = Math.round(m / 60);
+  if (h < 36) return `in ${h}h`;
+  return `in ${Math.round(h / 24)}d`;
+}

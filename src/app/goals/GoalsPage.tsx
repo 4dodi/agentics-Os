@@ -1,16 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Bot, CheckCircle2, Circle, Pause, Play, Plus, Trash2, Wand2 } from "lucide-react";
 import type { AgentId, Goal } from "@/lib/types";
 import { api, timeAgo } from "@/lib/client";
 import { PageHeader } from "@/components/PageHeader";
 import { Empty, SectionTitle, Spinner, Tabs, useToast } from "@/components/ui";
+import { AutomationPanel } from "./AutomationPanel";
 
 type Filter = "active" | "automation" | "done" | "all";
 
-function GoalCard({ goal, onChange }: { goal: Goal; onChange: (g: Goal | null) => void }) {
+function GoalCard({ goal, onChange: replace }: { goal: Goal; onChange: (g: Goal | null, id: string) => void }) {
   const toast = useToast();
+  const onChange = useCallback((g: Goal | null) => replace(g, goal.id), [replace, goal.id]);
   const [planning, setPlanning] = useState(false);
   const [agent, setAgent] = useState<AgentId>("claude");
   const [newStep, setNewStep] = useState("");
@@ -24,7 +26,7 @@ function GoalCard({ goal, onChange }: { goal: Goal; onChange: (g: Goal | null) =
       <div className="row between" style={{ alignItems: "flex-start" }}>
         <div style={{ minWidth: 0 }}>
           <div className="eyebrow" style={{ fontSize: 10.5 }}>
-            {goal.kind === "automation" ? "Weekly automation" : "Goal"} · {goal.status}
+            {goal.kind === "automation" ? "Automation" : "Goal"} · {goal.status}
             {goal.target && ` · target ${goal.target}`}
           </div>
           <h3 style={{ marginTop: 6, fontSize: 19 }}>{goal.title}</h3>
@@ -62,6 +64,8 @@ function GoalCard({ goal, onChange }: { goal: Goal; onChange: (g: Goal | null) =
           <input type="range" min={0} max={100} step={5} value={goal.progress} onChange={(e) => patch({ progress: Number(e.target.value) })} style={{ flex: 1, accentColor: accent }} />
         </div>
       )}
+
+      {goal.kind === "automation" && <AutomationPanel goal={goal} onChange={onChange} />}
 
       <div className="row wrap" style={{ marginTop: 14, gap: 8 }}>
         <select className="select" value={agent} onChange={(e) => setAgent(e.target.value as AgentId)} style={{ width: 140, padding: "6px 30px 6px 10px", fontSize: 13 }}>
@@ -121,9 +125,14 @@ export function GoalsPage() {
   const load = () => api<Goal[]>("/api/goals").then(setGoals).catch(() => setGoals([]));
   useEffect(() => {
     load();
+    const f = new URLSearchParams(window.location.search).get("filter");
+    if (f === "active" || f === "automation" || f === "done" || f === "all") setFilter(f);
   }, []);
 
-  const replace = (id: string) => (g: Goal | null) => setGoals((l) => (l ? (g ? l.map((x) => (x.id === id ? g : x)) : l.filter((x) => x.id !== id)) : l));
+  const replace = useCallback(
+    (g: Goal | null, id: string) => setGoals((l) => (l ? (g ? l.map((x) => (x.id === id ? g : x)) : l.filter((x) => x.id !== id)) : l)),
+    [],
+  );
   const shown = (goals ?? []).filter((g) =>
     filter === "all" ? true : filter === "done" ? g.status === "done" : filter === "automation" ? g.kind === "automation" && g.status !== "done" : g.status !== "done",
   );
@@ -155,7 +164,7 @@ export function GoalsPage() {
             <input className="input" style={{ flex: "2 1 320px" }} placeholder="Why it matters (agents use this when planning)" value={why} onChange={(e) => setWhy(e.target.value)} />
             <select className="select" style={{ flex: "0 1 180px" }} value={kind} onChange={(e) => setKind(e.target.value as Goal["kind"])}>
               <option value="goal">Goal</option>
-              <option value="automation">Weekly automation</option>
+              <option value="automation">Automation (scheduled)</option>
             </select>
             <button className="btn primary" type="submit" disabled={!title.trim()}>
               <Plus size={15} /> Add
@@ -180,7 +189,7 @@ export function GoalsPage() {
       ) : shown.length ? (
         <div className="grid cols-2">
           {shown.map((g) => (
-            <GoalCard key={g.id} goal={g} onChange={replace(g.id)} />
+            <GoalCard key={g.id} goal={g} onChange={replace} />
           ))}
         </div>
       ) : (

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { Bot, Brain, Download, Plus, Save, Trash2, TrendingUp, User, Wand2 } from "lucide-react";
+import { Bot, Brain, Download, Mic, Plus, Save, Trash2, TrendingUp, User, Wand2 } from "lucide-react";
 import type { SeoSite, Settings } from "@/lib/types";
 import { api } from "@/lib/client";
 import { PageHeader } from "@/components/PageHeader";
@@ -131,6 +131,20 @@ export function SettingsPage() {
         {toggle("vault.injectByDefault", "Use memory for background tasks (kanban runs) by default")}
       </Section>
 
+      <Section id="omi" icon={Mic} title="OMI (daily memory import)">
+        <p className="muted" style={{ margin: 0, fontSize: 13.5 }}>
+          Conversations captured by your OMI wearable become one note per day in your vault, so every agent remembers them.
+          Create a developer key in the OMI app: Settings → Developer → Create key (starts with <code>omi_dev_</code>).
+        </p>
+        <div className="grid cols-2">
+          {text("omi.apiKey", "OMI developer API key", undefined, { secret: true })}
+          {text("omi.folder", "Vault folder", "Notes are written as <folder>/OMI YYYY-MM-DD.md.", { mono: false })}
+          {text("omi.baseUrl", "API base URL", "Leave as https://api.omi.me unless you self-host OMI.")}
+        </div>
+        {toggle("omi.autoImport", "Import new conversations automatically (every 6 hours while Agentic OS runs)")}
+        {toggle("omi.includeTranscript", "Include transcripts (longer notes, richer memory)")}
+      </Section>
+
       <Section id="agents" icon={Bot} title="Agents">
         <div className="row between"><h3>Claude Code</h3>{pill("claude")}</div>
         {toggle("agents.claude.enabled", "Enabled")}
@@ -217,6 +231,21 @@ export function SettingsPage() {
           {text("seo.netlifyToken", "Netlify personal access token", "Netlify → User settings → Applications → New access token.", { secret: true })}
           {select("seo.engine", "Default writing engine", [["claude", "Claude"], ["hermes", "Hermes"], ["openclaw", "OpenClaw"], ["api", "API"]])}
         </div>
+        <label className="field">
+          Search Console service-account key (JSON)
+          <textarea
+            className="textarea mono"
+            rows={3}
+            spellCheck={false}
+            value={d.seo.gscServiceAccount}
+            placeholder='{"type": "service_account", "client_email": "…", "private_key": "…"}'
+            onChange={(e) => upd("seo.gscServiceAccount", e.target.value)}
+          />
+          <span className="hint">
+            Optional: powers the clicks charts on SEO → History. Google Cloud → IAM → Service accounts → Keys → Add key (JSON). Then add the
+            account&apos;s email as a user on each Search Console property. Stored locally and masked here.
+          </span>
+        </label>
         {toggle("seo.preserveExisting", "Preserve existing site files on deploy (recommended — only /blog/ is updated)")}
         {toggle("seo.useMemory", "Personalise articles with memory by default")}
 
@@ -256,6 +285,10 @@ export function SettingsPage() {
                 Editorial angle
                 <input className="input" value={s.angle} placeholder="e.g. beginner tutorials · honest comparisons · case studies" onChange={(e) => setSite(i, { angle: e.target.value })} />
               </label>
+              <label className="field" style={{ flex: "2 1 200px" }}>
+                Search Console property
+                <input className="input mono" value={s.gscProperty || ""} placeholder={s.domain ? `sc-domain:${s.domain}` : "sc-domain:example.com"} onChange={(e) => setSite(i, { gscProperty: e.target.value })} />
+              </label>
               <label className="field" style={{ flex: "1 1 100px" }}>
                 Blog path
                 <input className="input mono" value={s.blogPath} onChange={(e) => setSite(i, { blogPath: e.target.value })} />
@@ -275,7 +308,7 @@ export function SettingsPage() {
           onClick={() =>
             setSites([
               ...sites,
-              { id: "", name: "", domain: "", netlifySiteId: "", color: ["#fb7185", "#c084fc", "#22d3ee", "#f472b6", "#a3e635"][sites.length % 5], angle: "", blogPath: "blog", enabled: true },
+              { id: "", name: "", domain: "", netlifySiteId: "", color: ["#fb7185", "#c084fc", "#22d3ee", "#f472b6", "#a3e635"][sites.length % 5], angle: "", blogPath: "blog", enabled: true, gscProperty: "" },
             ])
           }
         >

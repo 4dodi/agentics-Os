@@ -103,7 +103,7 @@ Browser (Next.js React UI) ──► Next.js route handlers (/api/*)  ── loc
 
 Status: v0.1 built and verified. Claude Code tested live; Hermes and OpenClaw tested through the mock CLIs;
 Netlify deploys tested against a mock API, including the check that existing site files are preserved;
-20 unit tests; production build passes.
+30 unit tests; production build passes.
 
 **Not verified yet:** real Hermes/OpenClaw CLI flags (they're editable templates), a real Netlify account,
 and real image/video generation tools.
@@ -116,8 +116,14 @@ and real image/video generation tools.
 - [x] Validation of SEO site fields, goal and kanban updates; prototype-safe settings merge
 - [x] Dependencies updated (Next 16.4.6, marked 18.2, lucide-react 1.72, geist 1.9); `npm audit` clean
 
-### Later (v2 ideas)
-- OMI daily memory import → vault; scheduled automations ("one per week") runner
+### Phase 7 — v2 features ✅
+- [x] Scheduled automations runner: hourly/daily/weekly per automation goal, Run now, run history, results to the journal
+- [x] OMI daily memory import → `OMI/OMI YYYY-MM-DD.md` notes (API or export file, auto-import every 6 hours, no duplicates)
+- [x] Google Search Console clicks per site on SEO → History (service account, 7/28/90 days, chart + table)
+- [x] Multi-agent Boardroom: parallel answers streamed side by side, a chair writes the recommendation, saved meetings
+- [x] Kanban for Hermes tasks (already shipped in v0.1, in each Control Room)
+
+### Later (v3 ideas)
 - Hyperframes / Remotion skill launchers in Studio (video editing by file path)
-- Google Search Console clicks chart on SEO History
-- Kanban for Hermes tasks; multi-agent "boardroom" chat
+- Search Console queries and pages per article; automations that react to ranking changes
+- Boardroom follow-up rounds (members respond to each other)

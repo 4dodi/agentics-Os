@@ -3,6 +3,7 @@ import { newId, readJson, updateJson } from "@/lib/store";
 import { body, fail, json } from "@/lib/http";
 import { logActivity } from "@/lib/activity";
 import { withProgress } from "@/lib/goals";
+import { withSpec } from "@/lib/automations";
 
 export const dynamic = "force-dynamic";
 const FILE = "goals.json";
@@ -15,7 +16,7 @@ export async function POST(req: Request) {
   const b = await body<Partial<Goal>>(req);
   if (!b.title?.trim()) return fail("title is required");
   const now = Date.now();
-  const goal: Goal = {
+  let goal: Goal = {
     id: newId("g_"),
     title: b.title.trim(),
     why: b.why || "",
@@ -27,6 +28,7 @@ export async function POST(req: Request) {
     createdAt: now,
     updatedAt: now,
   };
+  if (goal.kind === "automation") goal = withSpec(goal, b.automation ?? {}, now);
   await updateJson<Goal[]>(FILE, [], (l) => [goal, ...l]);
   await logActivity({ kind: "goal", title: `New ${goal.kind}: ${goal.title}`, href: "/goals" });
   return json(goal);
@@ -50,6 +52,7 @@ export async function PATCH(req: Request) {
       if (b.status === "active" || b.status === "done" || b.status === "paused") edit.status = b.status;
       if (typeof b.progress === "number" && Number.isFinite(b.progress)) edit.progress = Math.max(0, Math.min(100, Math.round(b.progress)));
       out = withProgress({ ...g, ...edit, milestones, updatedAt: Date.now() } as Goal);
+      if (out.kind === "automation" && (b.automation !== undefined || !out.automation)) out = withSpec(out, b.automation ?? {});
       if (out.milestones.length && out.progress === 100 && g.status !== "done" && b.status === undefined) out.status = "done";
       completed = out.status === "done" && g.status !== "done";
       return out;

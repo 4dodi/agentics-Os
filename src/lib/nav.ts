@@ -1,5 +1,5 @@
 import {
-  LayoutGrid, Target, TrendingUp, Wand2, BookOpen, Brain, Sparkles, Settings as SettingsIcon, type LucideIcon,
+  LayoutGrid, Target, Users, TrendingUp, Wand2, BookOpen, Brain, Sparkles, Settings as SettingsIcon, type LucideIcon,
 } from "lucide-react";
 import type { AgentId } from "./types";
 
@@ -24,7 +24,8 @@ export const NAV: NavItem[] = [
   { href: "/claude", label: "Claude", accent: AGENT_META.claude.accent, agent: "claude", group: "agents", hint: "Chat with Claude Code" },
   { href: "/openclaw", label: "OpenClaw", accent: AGENT_META.openclaw.accent, agent: "openclaw", group: "agents", hint: "Chat with OpenClaw" },
   { href: "/hermes", label: "Hermes", accent: AGENT_META.hermes.accent, agent: "hermes", group: "agents", hint: "Chat with Hermes" },
-  { href: "/goals", label: "Goals", accent: "#c084fc", icon: Target, group: "self", hint: "Goals & weekly automations" },
+  { href: "/boardroom", label: "Boardroom", accent: "#f59e0b", icon: Users, group: "agents", hint: "Ask every agent at once" },
+  { href: "/goals", label: "Goals", accent: "#c084fc", icon: Target, group: "self", hint: "Goals & scheduled automations" },
   { href: "/seo", label: "SEO", accent: "#a3e635", icon: TrendingUp, group: "self", hint: "Keyword → 5 articles → Netlify" },
   { href: "/studio", label: "Studio", accent: "#e86fd8", icon: Wand2, group: "self", hint: "Images, videos & speech" },
   { href: "/journal", label: "Journal", accent: "#fbbf24", icon: BookOpen, group: "self", hint: "Daily log in your vault" },
