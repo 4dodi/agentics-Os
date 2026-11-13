@@ -187,3 +187,7 @@ tests/                 unit tests + mock Netlify, OMI and Google servers
 ```
 
 See [ROADMAP.md](ROADMAP.md) for the plan and what's next.
+
+## License
+
+[MIT](LICENSE) © 2026 4dodi

@@ -2,6 +2,7 @@
   "name": "agentic-os",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "description": "Local-first operating system for your AI agents: Claude Code, Hermes, OpenClaw, SEO pipeline, Studio and Obsidian memory.",
   "scripts": {
     "dev": "next dev -H 127.0.0.1 -p 3737",
